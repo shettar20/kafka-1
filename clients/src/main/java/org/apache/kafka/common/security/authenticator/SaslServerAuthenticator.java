@@ -67,8 +67,9 @@ public class SaslServerAuthenticator implements Authenticator {
     // buffers used in `authenticate`
     private NetworkReceive netInBuffer;
     private NetworkSend netOutBuffer;
+    private final String mechanism;
 
-    public SaslServerAuthenticator(String node, final Subject subject, KerberosShortNamer kerberosNameParser) throws IOException {
+    public SaslServerAuthenticator(String node, final Subject subject, KerberosShortNamer kerberosNameParser, String mechanism) throws IOException {
         if (subject == null)
             throw new IllegalArgumentException("subject cannot be null");
         if (subject.getPrincipals().isEmpty())
@@ -76,6 +77,7 @@ public class SaslServerAuthenticator implements Authenticator {
         this.node = node;
         this.subject = subject;
         this.kerberosNamer = kerberosNameParser;
+        this.mechanism = mechanism;
         saslServer = createSaslServer();
     }
 
@@ -97,7 +99,7 @@ public class SaslServerAuthenticator implements Authenticator {
         final String servicePrincipalName = kerberosName.serviceName();
         final String serviceHostname = kerberosName.hostName();
 
-        final String mech = "GSSAPI";
+        final String mech = this.mechanism;
 
         LOG.debug("Creating SaslServer for {} with mechanism {}", kerberosName, mech);
 

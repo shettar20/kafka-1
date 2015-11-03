@@ -48,5 +48,10 @@ public class SaslConfigs {
             "The rules are evaluated in order and the first rule that matches a principal name is used to map it to a short name. Any later rules in the list are ignored. " +
             "By default, principal names of the form <username>/<hostname>@<REALM> are mapped to <username>.";
     public static final List<String> DEFAULT_SASL_KERBEROS_PRINCIPAL_TO_LOCAL_RULES = Collections.singletonList("DEFAULT");
+    
+    public static final String SASL_MECHANISM = "sasl.mechanism";
+    public static final String SASL_MECHANISM_DOC = "The sasl mechanism. Default will be GSSAPI";
+    public static final String DEFAULT_SASL_MECHANISM = "GSSAPI";
+
 
 }

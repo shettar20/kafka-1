@@ -22,8 +22,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Map;
-
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -47,7 +47,6 @@ import org.apache.kafka.common.network.TransportLayer;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.common.security.auth.PrincipalBuilder;
 import org.apache.kafka.common.KafkaException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,13 +72,15 @@ public class SaslClientAuthenticator implements Authenticator {
     private NetworkReceive netInBuffer;
     private NetworkSend netOutBuffer;
 
+    private final String mechanism;
     private SaslState saslState = SaslState.INITIAL;
 
-    public SaslClientAuthenticator(String node, Subject subject, String servicePrincipal, String host) throws IOException {
+    public SaslClientAuthenticator(String node, Subject subject, String servicePrincipal, String host, String mechanism) throws IOException {
         this.node = node;
         this.subject = subject;
         this.host = host;
         this.servicePrincipal = servicePrincipal;
+        this.mechanism = mechanism;
     }
 
     public void configure(TransportLayer transportLayer, PrincipalBuilder principalBuilder, Map<String, ?> configs) throws KafkaException {
@@ -99,11 +100,11 @@ public class SaslClientAuthenticator implements Authenticator {
         try {
             return Subject.doAs(subject, new PrivilegedExceptionAction<SaslClient>() {
                 public SaslClient run() throws SaslException {
-                    String[] mechs = {"GSSAPI"};
+                    String[] mechs = {mechanism};
                     LOG.debug("Creating SaslClient: client={};service={};serviceHostname={};mechs={}",
                         clientPrincipalName, servicePrincipal, host, Arrays.toString(mechs));
                     return Sasl.createSaslClient(mechs, clientPrincipalName, servicePrincipal, host, null,
-                            new ClientCallbackHandler());
+                            new ClientCallbackHandler(subject, mechanism));
                 }
             });
         } catch (PrivilegedActionException e) {
@@ -222,6 +223,13 @@ public class SaslClientAuthenticator implements Authenticator {
     }
 
     public static class ClientCallbackHandler implements CallbackHandler {
+        
+        private final Subject subject;
+        private final String mechanism;
+        public ClientCallbackHandler(Subject subject, String mechanism) {
+            this.subject = subject;
+            this.mechanism = mechanism;
+        }
 
         public void handle(Callback[] callbacks) throws UnsupportedCallbackException {
             for (Callback callback : callbacks) {
@@ -229,13 +237,24 @@ public class SaslClientAuthenticator implements Authenticator {
                     NameCallback nc = (NameCallback) callback;
                     nc.setName(nc.getDefaultName());
                 } else if (callback instanceof PasswordCallback) {
-                    // Call `setPassword` once we support obtaining a password from the user and update message below
-                    throw new UnsupportedCallbackException(callback, "Could not login: the client is being asked for a password, but the Kafka" +
+                    boolean hasPassword = false;
+                    if (subject != null && !mechanism.equals("GSSAPI")) {
+                        Iterator<?> iterator = subject.getPrivateCredentials().iterator();
+                        if (iterator.hasNext()) {
+                            ((PasswordCallback) callback).setPassword(((String) iterator.next()).toCharArray());
+                            hasPassword = true;
+                        }
+                    }
+                    
+                    if (!hasPassword) {
+                        // Call `setPassword` once we support obtaining a password from the user and update message below
+                        throw new UnsupportedCallbackException(callback, "Could not login: the client is being asked for a password, but the Kafka" +
                              " client code does not currently support obtaining a password from the user." +
                              " Make sure -Djava.security.auth.login.config property passed to JVM and" +
                              " the client is configured to use a ticket cache (using" +
                              " the JAAS configuration setting 'useTicketCache=true)'. Make sure you are using" +
                              " FQDN of the Kafka broker you are trying to connect to.");
+                    }
                 } else if (callback instanceof RealmCallback) {
                     RealmCallback rc = (RealmCallback) callback;
                     rc.setText(rc.getDefaultText());

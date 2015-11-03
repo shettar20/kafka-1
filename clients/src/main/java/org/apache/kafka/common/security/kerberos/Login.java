@@ -59,7 +59,7 @@ public class Login {
     private final String loginContextName;
     private final String principal;
     private final Time time = new SystemTime();
-    private final CallbackHandler callbackHandler = new ClientCallbackHandler();
+    private final CallbackHandler callbackHandler = new ClientCallbackHandler(null, "GSSAPI");
 
     // LoginThread will sleep until 80% of time from last refresh to
     // ticket's expiry has been reached, at which time it will wake

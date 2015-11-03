@@ -46,6 +46,7 @@ public class SaslChannelBuilder implements ChannelBuilder {
     private SslFactory sslFactory;
     private Map<String, ?> configs;
     private KerberosShortNamer kerberosShortNamer;
+    private String mechanism;
 
     public SaslChannelBuilder(Mode mode, LoginType loginType, SecurityProtocol securityProtocol) {
         this.mode = mode;
@@ -59,6 +60,9 @@ public class SaslChannelBuilder implements ChannelBuilder {
             this.loginManager = LoginManager.acquireLoginManager(loginType, configs);
             this.principalBuilder = (PrincipalBuilder) Utils.newInstance((Class<?>) configs.get(SslConfigs.PRINCIPAL_BUILDER_CLASS_CONFIG));
             this.principalBuilder.configure(configs);
+            this.mechanism = (String) this.configs.get(SaslConfigs.SASL_MECHANISM);
+            if (mechanism == null)
+                mechanism = "GSSAPI";
 
             String defaultRealm;
             try {
@@ -86,10 +90,10 @@ public class SaslChannelBuilder implements ChannelBuilder {
             TransportLayer transportLayer = buildTransportLayer(id, key, socketChannel);
             Authenticator authenticator;
             if (mode == Mode.SERVER)
-                authenticator = new SaslServerAuthenticator(id, loginManager.subject(), kerberosShortNamer);
+                authenticator = new SaslServerAuthenticator(id, loginManager.subject(), kerberosShortNamer, mechanism);
             else
                 authenticator = new SaslClientAuthenticator(id, loginManager.subject(), loginManager.serviceName(),
-                        socketChannel.socket().getInetAddress().getHostName());
+                        socketChannel.socket().getInetAddress().getHostName(), mechanism);
             authenticator.configure(transportLayer, this.principalBuilder, this.configs);
             return new KafkaChannel(id, transportLayer, authenticator, maxReceiveSize);
         } catch (Exception e) {

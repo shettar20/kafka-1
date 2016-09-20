@@ -14,29 +14,39 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.kafka.common.security.authenticator;
+package org.apache.kafka.common.security.auth;
 
 import java.util.Map;
 
-import org.apache.kafka.common.network.Mode;
-
 import javax.security.auth.Subject;
-import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.login.Configuration;
+import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
 
-/*
- * Callback handler for SASL-based authentication
+/**
+ * Login interface for authentication.
  */
-public interface AuthCallbackHandler extends CallbackHandler {
+public interface Login {
 
     /**
-     * Configures this callback handler.
-     *
-     * @param configs Configuration
-     * @param mode The mode that indicates if this is a client or server connection
-     * @param subject Subject from login context
-     * @param saslMechanism Negotiated SASL mechanism
+     * Configures this login instance.
      */
-    void configure(Map<String, ?> configs, Mode mode, Subject subject, String saslMechanism);
+    void configure(Map<String, ?> configs, String contextName, Configuration configuration);
+
+    /**
+     * Performs login for each login module specified for the login context of this instance.
+     */
+    LoginContext login() throws LoginException;
+
+    /**
+     * Returns the authenticated subject of this login context.
+     */
+    Subject subject();
+
+    /**
+     * Returns the service name to be used for SASL.
+     */
+    String serviceName();
 
     /**
      * Closes this instance.

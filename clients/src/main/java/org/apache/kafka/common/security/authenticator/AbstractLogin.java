@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.common.security.authenticator;
 
+import javax.security.auth.login.Configuration;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 import javax.security.sasl.RealmCallback;
@@ -26,7 +27,7 @@ import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.Subject;
 
-import org.apache.kafka.common.security.JaasContext;
+import org.apache.kafka.common.security.auth.Login;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,17 +39,19 @@ import java.util.Map;
 public abstract class AbstractLogin implements Login {
     private static final Logger log = LoggerFactory.getLogger(AbstractLogin.class);
 
-    private JaasContext jaasContext;
+    private String contextName;
+    private Configuration configuration;
     private LoginContext loginContext;
 
     @Override
-    public void configure(Map<String, ?> configs, JaasContext jaasContext) {
-        this.jaasContext = jaasContext;
+    public void configure(Map<String, ?> configs, String contextName, Configuration configuration) {
+        this.contextName = contextName;
+        this.configuration = configuration;
     }
 
     @Override
     public LoginContext login() throws LoginException {
-        loginContext = new LoginContext(jaasContext.name(), null, new LoginCallbackHandler(), jaasContext.configuration());
+        loginContext = new LoginContext(contextName, null, new LoginCallbackHandler(), configuration);
         loginContext.login();
         log.info("Successfully logged in.");
         return loginContext;
@@ -59,8 +62,12 @@ public abstract class AbstractLogin implements Login {
         return loginContext.getSubject();
     }
 
-    protected JaasContext jaasContext() {
-        return jaasContext;
+    protected String contextName() {
+        return contextName;
+    }
+
+    protected Configuration configuration() {
+        return configuration;
     }
 
     /**

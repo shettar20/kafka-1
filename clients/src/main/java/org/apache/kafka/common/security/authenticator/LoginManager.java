@@ -23,11 +23,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.config.types.Password;
+import org.apache.kafka.common.network.ListenerName;
 import org.apache.kafka.common.security.JaasContext;
-import org.apache.kafka.common.security.kerberos.KerberosLogin;
+import org.apache.kafka.common.security.auth.Login;
+import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,20 +39,20 @@ public class LoginManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoginManager.class);
 
     // static configs (broker or client)
-    private static final Map<String, LoginManager> STATIC_INSTANCES = new HashMap<>();
+    private static final Map<LoginMetadata<String>, LoginManager> STATIC_INSTANCES = new HashMap<>();
 
     // dynamic configs (client-only)
-    private static final Map<Password, LoginManager> DYNAMIC_INSTANCES = new HashMap<>();
+    private static final Map<LoginMetadata<Password>, LoginManager> DYNAMIC_INSTANCES = new HashMap<>();
 
     private final Login login;
-    private final Object cacheKey;
+    private final LoginMetadata<?> loginMetadata;
     private int refCount;
 
-    private LoginManager(JaasContext jaasContext, boolean hasKerberos, Map<String, ?> configs,
-                         Object cacheKey) throws IOException, LoginException {
-        this.cacheKey = cacheKey;
-        login = hasKerberos ? new KerberosLogin() : new DefaultLogin();
-        login.configure(configs, jaasContext);
+    private LoginManager(JaasContext jaasContext, Map<String, ?> configs,
+                         LoginMetadata<?> loginMetadata) throws IOException, LoginException {
+        this.loginMetadata = loginMetadata;
+        this.login = Utils.newInstance(loginMetadata.loginClass);
+        login.configure(configs, jaasContext.name(), jaasContext.configuration());
         login.login();
     }
 
@@ -78,22 +81,26 @@ public class LoginManager {
      * @param configs Config options used to configure `Login` if a new login manager is created.
      *
      */
-    public static LoginManager acquireLoginManager(JaasContext jaasContext, String saslMechanism, boolean hasKerberos,
+    public static LoginManager acquireLoginManager(JaasContext jaasContext, String saslMechanism,
+                                                   Class<? extends Login> defaultLoginClass,
                                                    Map<String, ?> configs) throws IOException, LoginException {
+        Class<? extends Login> loginClass = loginClass(configs, jaasContext.type(), saslMechanism, defaultLoginClass);
         synchronized (LoginManager.class) {
             LoginManager loginManager;
             Password jaasConfigValue = jaasContext.dynamicJaasConfig();
             if (jaasConfigValue != null) {
-                loginManager = DYNAMIC_INSTANCES.get(jaasConfigValue);
+                LoginMetadata<Password> loginMetadata = new LoginMetadata<>(jaasConfigValue, loginClass);
+                loginManager = DYNAMIC_INSTANCES.get(loginMetadata);
                 if (loginManager == null) {
-                    loginManager = new LoginManager(jaasContext, saslMechanism.equals(SaslConfigs.GSSAPI_MECHANISM), configs, jaasConfigValue);
-                    DYNAMIC_INSTANCES.put(jaasConfigValue, loginManager);
+                    loginManager = new LoginManager(jaasContext, configs, loginMetadata);
+                    DYNAMIC_INSTANCES.put(loginMetadata, loginManager);
                 }
             } else {
-                loginManager = STATIC_INSTANCES.get(jaasContext.name());
+                LoginMetadata<String> loginMetadata = new LoginMetadata<>(jaasContext.name(), loginClass);
+                loginManager = STATIC_INSTANCES.get(loginMetadata);
                 if (loginManager == null) {
-                    loginManager = new LoginManager(jaasContext, hasKerberos, configs, jaasContext.name());
-                    STATIC_INSTANCES.put(jaasContext.name(), loginManager);
+                    loginManager = new LoginManager(jaasContext, configs, loginMetadata);
+                    STATIC_INSTANCES.put(loginMetadata, loginManager);
                 }
             }
             return loginManager.acquire();
@@ -110,7 +117,7 @@ public class LoginManager {
 
     // Only for testing
     Object cacheKey() {
-        return cacheKey;
+        return loginMetadata.configInfo;
     }
 
     private LoginManager acquire() {
@@ -127,10 +134,10 @@ public class LoginManager {
             if (refCount == 0)
                 throw new IllegalStateException("release() called on disposed " + this);
             else if (refCount == 1) {
-                if (cacheKey instanceof Password) {
-                    DYNAMIC_INSTANCES.remove(cacheKey);
+                if (loginMetadata.configInfo instanceof Password) {
+                    DYNAMIC_INSTANCES.remove(loginMetadata);
                 } else {
-                    STATIC_INSTANCES.remove(cacheKey);
+                    STATIC_INSTANCES.remove(loginMetadata);
                 }
                 login.close();
             }
@@ -150,10 +157,45 @@ public class LoginManager {
     /* Should only be used in tests. */
     public static void closeAll() {
         synchronized (LoginManager.class) {
-            for (String key : new ArrayList<>(STATIC_INSTANCES.keySet()))
+            for (LoginMetadata<String> key : new ArrayList<>(STATIC_INSTANCES.keySet()))
                 STATIC_INSTANCES.remove(key).login.close();
-            for (Password key : new ArrayList<>(DYNAMIC_INSTANCES.keySet()))
+            for (LoginMetadata<Password> key : new ArrayList<>(DYNAMIC_INSTANCES.keySet()))
                 DYNAMIC_INSTANCES.remove(key).login.close();
+        }
+    }
+
+    private static Class<? extends Login> loginClass(Map<String, ?> configs,
+                                                     JaasContext.Type contextType,
+                                                     String saslMechanism,
+                                                     Class<? extends Login> defaultLoginClass) {
+        String prefix  = contextType == JaasContext.Type.SERVER ? ListenerName.saslMechanismPrefix(saslMechanism) : "";
+        Class<? extends Login> loginClass = (Class<? extends Login>) configs.get(prefix + SaslConfigs.SASL_LOGIN_CLASS);
+        if (loginClass == null)
+            loginClass = defaultLoginClass;
+        return loginClass;
+    }
+
+    private static class LoginMetadata<T> {
+        final T configInfo;
+        final Class<? extends Login> loginClass;
+
+        LoginMetadata(T configInfo, Class<? extends Login> loginClass) {
+            this.configInfo = configInfo;
+            this.loginClass = loginClass;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(configInfo, loginClass);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            LoginMetadata<?> loginMetadata = (LoginMetadata<?>) o;
+            return Objects.equals(configInfo, loginMetadata.configInfo) && Objects.equals(loginClass, loginMetadata.loginClass);
         }
     }
 }

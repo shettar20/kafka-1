@@ -14,44 +14,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.kafka.common.security.authenticator;
 
-import org.apache.kafka.common.security.JaasContext;
+package org.apache.kafka.common.security.auth;
 
+import java.util.List;
 import java.util.Map;
 
-import javax.security.auth.Subject;
-import javax.security.auth.login.LoginContext;
-import javax.security.auth.login.LoginException;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.login.AppConfigurationEntry;
 
-/**
- * Login interface for authentication.
+/*
+ * Callback handler for SASL-based authentication
  */
-public interface Login {
+public interface AuthenticateCallbackHandler extends CallbackHandler {
 
     /**
-     * Configures this login instance.
+     * Configures this callback handler for the specified SASL mechanism.
+     * @param configs Configuration options
+     * @param saslMechanism Negotiated SASL mechanism
+     * @param jaasConfigEntries JAAS configuration entries from the JAAS login context.
+     *        This list contains a single entry for clients and may contain more than
+     *        one entry for servers if multiple mechanisms are enabled on a listener.
      */
-    void configure(Map<String, ?> configs, JaasContext jaasContext);
-
-    /**
-     * Performs login for each login module specified for the login context of this instance.
-     */
-    LoginContext login() throws LoginException;
-
-    /**
-     * Returns the authenticated subject of this login context.
-     */
-    Subject subject();
-
-    /**
-     * Returns the service name to be used for SASL.
-     */
-    String serviceName();
+    void configure(Map<String, ?> configs, String saslMechanism, List<AppConfigurationEntry> jaasConfigEntries);
 
     /**
      * Closes this instance.
      */
     void close();
 }
-

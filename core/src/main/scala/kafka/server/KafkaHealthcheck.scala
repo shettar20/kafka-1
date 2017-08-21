@@ -25,8 +25,10 @@ import kafka.api.ApiVersion
 import kafka.cluster.EndPoint
 import kafka.metrics.KafkaMetricsGroup
 import kafka.utils._
+import com.yammer.metrics.core.Gauge
 import org.I0Itec.zkclient.IZkStateListener
 import org.apache.kafka.common.protocol.SecurityProtocol
+import org.apache.zookeeper.ZooKeeper.States
 import org.apache.zookeeper.Watcher.Event.KeeperState
 
 /**
@@ -43,7 +45,7 @@ class KafkaHealthcheck(brokerId: Int,
                        rack: Option[String],
                        interBrokerProtocolVersion: ApiVersion) extends Logging {
 
-  private[server] val sessionExpireListener = new SessionExpireListener
+  private[server] val sessionExpireListener = new SessionExpireListener(() => zkUtils.zkConnection.getZookeeperState)
 
   def startup() {
     zkUtils.subscribeStateChanges(sessionExpireListener)
@@ -76,7 +78,7 @@ class KafkaHealthcheck(brokerId: Int,
    *  a connection for us. We need to re-register this broker in the broker registry. We rely on `handleStateChanged`
    *  to record ZooKeeper connection state metrics.
    */
-  class SessionExpireListener extends IZkStateListener with KafkaMetricsGroup {
+  class SessionExpireListener(val state: () => States) extends IZkStateListener with KafkaMetricsGroup {
 
     private[server] val stateToMeterMap = {
       import KeeperState._
@@ -92,6 +94,11 @@ class KafkaHealthcheck(brokerId: Int,
         state -> newMeter(s"ZooKeeper${eventType}PerSec", eventType.toLowerCase(Locale.ROOT), TimeUnit.SECONDS)
       }
     }
+    private[server] val sessionStateGauge =
+      newGauge("SessionState",
+        new Gauge[String] {
+          def value = String.valueOf(state())
+        })
 
     @throws[Exception]
     override def handleStateChanged(state: KeeperState) {

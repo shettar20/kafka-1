@@ -32,6 +32,7 @@ import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLSession;
+import javax.security.sasl.AuthenticationException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
@@ -311,7 +312,7 @@ public class SslTransportLayer implements TransportLayer {
 
         } catch (SSLException e) {
             handshakeFailure();
-            throw e;
+            throw new AuthenticationException("SSL handshake failed", e);
         }
     }
 

@@ -21,6 +21,7 @@ import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.protocol.types.Struct;
 
 import java.nio.ByteBuffer;
+import java.util.Map;
 
 public class SyncGroupResponse extends AbstractResponse {
 
@@ -64,6 +65,11 @@ public class SyncGroupResponse extends AbstractResponse {
 
     public Errors error() {
         return error;
+    }
+
+    @Override
+    public Map<Errors, Integer> errorCounts() {
+        return errorCounts(error);
     }
 
     public ByteBuffer memberAssignment() {

@@ -42,6 +42,7 @@ import org.apache.kafka.common.memory.MemoryPool;
 import org.apache.kafka.common.metrics.Measurable;
 import org.apache.kafka.common.metrics.MetricConfig;
 import org.apache.kafka.common.MetricName;
+import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.metrics.stats.Avg;
@@ -267,6 +268,9 @@ public class Selector implements Selectable, AutoCloseable {
         }
         key.attach(channel);
         this.channels.put(id, channel);
+        // Include PLAINTEXT in successful authentication metric, all others added after KafkaChannel.prepare()
+        if (channel.ready())
+            sensors.successfulAuthentication.record();
         return channel;
     }
 
@@ -455,7 +459,14 @@ public class Selector implements Selectable, AutoCloseable {
 
                 /* if channel is not ready finish prepare */
                 if (channel.isConnected() && !channel.ready()) {
-                    channel.prepare();
+                    try {
+                        channel.prepare();
+                    } catch (AuthenticationException e) {
+                        sensors.failedAuthentication.record();
+                        throw new IOException(e);
+                    }
+                    if (channel.ready())
+                        sensors.successfulAuthentication.record();
                 }
 
                 attemptRead(key, channel);
@@ -485,6 +496,8 @@ public class Selector implements Selectable, AutoCloseable {
                 String desc = channel.socketDescription();
                 if (e instanceof IOException)
                     log.debug("Connection with {} disconnected", desc, e);
+                else if (e instanceof AuthenticationException)
+                    log.debug("Connection with {} failed authentication", desc, e); // logged as errors by clients
                 else
                     log.warn("Unexpected error from {}; closing connection", desc, e);
                 close(channel, true);
@@ -836,6 +849,8 @@ public class Selector implements Selectable, AutoCloseable {
 
         public final Sensor connectionClosed;
         public final Sensor connectionCreated;
+        public final Sensor successfulAuthentication;
+        public final Sensor failedAuthentication;
         public final Sensor bytesTransferred;
         public final Sensor bytesSent;
         public final Sensor bytesReceived;
@@ -867,6 +882,14 @@ public class Selector implements Selectable, AutoCloseable {
             this.connectionCreated = sensor("connections-created:" + tagsSuffix.toString());
             this.connectionCreated.add(createMeter(metrics, metricGrpName, metricTags,
                     "connection-creation", "new connections established"));
+
+            this.successfulAuthentication = sensor("successful-authentication:" + tagsSuffix.toString());
+            this.successfulAuthentication.add(createMeter(metrics, metricGrpName, metricTags,
+                    "successful-authentication", "connections with successful authentication"));
+
+            this.failedAuthentication = sensor("failed-authentication:" + tagsSuffix.toString());
+            this.failedAuthentication.add(createMeter(metrics, metricGrpName, metricTags,
+                    "failed-authentication", "connections with failed authentication"));
 
             this.bytesTransferred = sensor("bytes-sent-received:" + tagsSuffix.toString());
             bytesTransferred.add(createMeter(metrics, metricGrpName, metricTags, new Count(),

@@ -22,6 +22,7 @@ import org.apache.kafka.common.protocol.types.Struct;
 import org.apache.kafka.common.record.RecordBatch;
 
 import java.nio.ByteBuffer;
+import java.util.Map;
 
 public class InitProducerIdResponse extends AbstractResponse {
     // Possible error codes:
@@ -67,6 +68,11 @@ public class InitProducerIdResponse extends AbstractResponse {
 
     public Errors error() {
         return error;
+    }
+
+    @Override
+    public Map<Errors, Integer> errorCounts() {
+        return errorCounts(error);
     }
 
     public short epoch() {

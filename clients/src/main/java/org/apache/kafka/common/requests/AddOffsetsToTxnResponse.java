@@ -21,6 +21,7 @@ import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.protocol.types.Struct;
 
 import java.nio.ByteBuffer;
+import java.util.Map;
 
 public class AddOffsetsToTxnResponse extends AbstractResponse {
     private static final String ERROR_CODE_KEY_NAME = "error_code";
@@ -54,6 +55,11 @@ public class AddOffsetsToTxnResponse extends AbstractResponse {
 
     public Errors error() {
         return error;
+    }
+
+    @Override
+    public Map<Errors, Integer> errorCounts() {
+        return errorCounts(error);
     }
 
     @Override

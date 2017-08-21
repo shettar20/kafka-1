@@ -17,11 +17,14 @@
 package org.apache.kafka.common.requests;
 
 import org.apache.kafka.common.protocol.ApiKeys;
+import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.protocol.types.Struct;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class CreateAclsResponse extends AbstractResponse {
     private final static String CREATION_RESPONSES = "creation_responses";
@@ -82,6 +85,14 @@ public class CreateAclsResponse extends AbstractResponse {
 
     public List<AclCreationResponse> aclCreationResponses() {
         return aclCreationResponses;
+    }
+
+    @Override
+    public Map<Errors, Integer> errorCounts() {
+        Map<Errors, Integer> errorCounts = new HashMap<>();
+        for (AclCreationResponse response : aclCreationResponses)
+            updateErrorCounts(errorCounts, response.error.error());
+        return errorCounts;
     }
 
     public static CreateAclsResponse parse(ByteBuffer buffer, short version) {

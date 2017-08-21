@@ -18,6 +18,7 @@
 package org.apache.kafka.common.requests;
 
 import org.apache.kafka.common.protocol.ApiKeys;
+import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.protocol.types.Struct;
 
 import java.nio.ByteBuffer;
@@ -56,6 +57,11 @@ public class AlterConfigsResponse extends AbstractResponse {
 
     public Map<Resource, ApiError> errors() {
         return errors;
+    }
+
+    @Override
+    public Map<Errors, Integer> errorCounts() {
+        return apiErrorCounts(errors);
     }
 
     public int throttleTimeMs() {

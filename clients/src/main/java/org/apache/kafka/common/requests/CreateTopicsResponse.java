@@ -18,6 +18,7 @@ package org.apache.kafka.common.requests;
 
 
 import org.apache.kafka.common.protocol.ApiKeys;
+import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.protocol.types.Struct;
 
 import java.nio.ByteBuffer;
@@ -93,6 +94,11 @@ public class CreateTopicsResponse extends AbstractResponse {
 
     public Map<String, ApiError> errors() {
         return errors;
+    }
+
+    @Override
+    public Map<Errors, Integer> errorCounts() {
+        return apiErrorCounts(errors);
     }
 
     public static CreateTopicsResponse parse(ByteBuffer buffer, short version) {

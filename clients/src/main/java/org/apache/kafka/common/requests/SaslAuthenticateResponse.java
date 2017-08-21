@@ -17,6 +17,7 @@
 package org.apache.kafka.common.requests;
 
 import java.nio.ByteBuffer;
+import java.util.Map;
 
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
@@ -70,6 +71,11 @@ public class SaslAuthenticateResponse extends AbstractResponse {
 
     public ByteBuffer saslAuthBytes() {
         return saslAuthBytes;
+    }
+
+    @Override
+    public Map<Errors, Integer> errorCounts() {
+        return errorCounts(error);
     }
 
     @Override

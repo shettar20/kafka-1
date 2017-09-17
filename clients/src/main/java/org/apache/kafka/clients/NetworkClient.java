@@ -94,7 +94,6 @@ public class NetworkClient implements KafkaClient {
     private final long reconnectBackoffMs;
 
     private final Time time;
-
     /**
      * True if we should send an ApiVersionRequest when first connecting to a broker.
      */
@@ -601,7 +600,7 @@ public class NetworkClient implements KafkaClient {
         nodesNeedingApiVersionsFetch.remove(nodeId);
         switch (disconnectState.state()) {
             case AUTHENTICATION_FAILED:
-                connectionStates.authenticationFailed(nodeId, now, Errors.AUTHENTICATION_FAILED.exception());
+                connectionStates.authenticationFailed(nodeId, now, disconnectState.exception());
                 log.error("Connection to node {} failed authentication due to: {}", nodeId, disconnectState.exception().getMessage());
                 break;
             case AUTHENTICATE:

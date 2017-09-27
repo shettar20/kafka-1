@@ -28,6 +28,7 @@ import kafka.integration.KafkaServerTestHarness
 import kafka.utils._
 import kafka.admin.{AdminOperationException, AdminUtils}
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.utils.Sanitizer
 
 import scala.collection.Map
 
@@ -65,8 +66,8 @@ class DynamicConfigChangeTest extends KafkaServerTestHarness {
 
     val quotaManagers = servers.head.apis.quotas
     rootEntityType match {
-      case ConfigType.Client => AdminUtils.changeClientIdConfig(zkUtils, configEntityName, props)
-      case _ => AdminUtils.changeUserOrUserClientIdConfig(zkUtils, configEntityName, props)
+      case ConfigType.Client => AdminUtils.changeClientIdConfig(zkUtils, Sanitizer.sanitize(configEntityName), props)
+      case _ => AdminUtils.changeUserOrUserClientIdConfig(zkUtils, Sanitizer.sanitize(configEntityName), props)
     }
 
     TestUtils.retry(10000) {
@@ -84,8 +85,8 @@ class DynamicConfigChangeTest extends KafkaServerTestHarness {
 
     val emptyProps = new Properties()
     rootEntityType match {
-      case ConfigType.Client => AdminUtils.changeClientIdConfig(zkUtils, configEntityName, emptyProps)
-      case _ => AdminUtils.changeUserOrUserClientIdConfig(zkUtils, configEntityName, emptyProps)
+      case ConfigType.Client => AdminUtils.changeClientIdConfig(zkUtils, Sanitizer.sanitize(configEntityName), emptyProps)
+      case _ => AdminUtils.changeUserOrUserClientIdConfig(zkUtils, Sanitizer.sanitize(configEntityName), emptyProps)
     }
     TestUtils.retry(10000) {
       val producerQuota = quotaManagers.produce.quota(user, clientId)

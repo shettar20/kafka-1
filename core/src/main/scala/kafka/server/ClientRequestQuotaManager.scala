@@ -41,7 +41,7 @@ class ClientRequestQuotaManager(private val config: ClientQuotaManagerConfig,
     }
 
     if (quotasEnabled) {
-      val quotaSensors = getOrCreateQuotaSensors(request.session.sanitizedUser, request.header.clientId)
+      val quotaSensors = getOrCreateQuotaSensors(request.session.principal.getName, request.header.clientId)
       request.recordNetworkThreadTimeCallback = Some(timeNanos => recordNoThrottle(quotaSensors, nanosToPercentage(timeNanos)))
 
       recordAndThrottleOnQuotaViolation(
@@ -64,11 +64,11 @@ class ClientRequestQuotaManager(private val config: ClientQuotaManagerConfig,
     math.min(super.throttleTime(clientMetric, config), maxThrottleTimeMs)
   }
 
-  override protected def clientRateMetricName(sanitizedUser: String, sanitizedClientId: String): MetricName = {
+  override protected def clientRateMetricName(sanitizedUser: String, clientId: String): MetricName = {
     metrics.metricName("request-time", QuotaType.Request.toString,
                    "Tracking request-time per user/client-id",
                    "user", sanitizedUser,
-                   "client-id", sanitizedClientId)
+                   "client-id", clientId)
   }
 
   private def exemptMetricName: MetricName = {

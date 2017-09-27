@@ -21,6 +21,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.UnsupportedEncodingException;
 
+import org.apache.kafka.common.utils.Sanitizer;
 import org.junit.Test;
 
 public class SanitizerTest {

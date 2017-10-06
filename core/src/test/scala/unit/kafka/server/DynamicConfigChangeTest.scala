@@ -57,7 +57,7 @@ class DynamicConfigChangeTest extends KafkaServerTestHarness {
     }
   }
 
-  private def testQuotaConfigChange(user: String, clientId: String, rootEntityType: String, configEntityName: String) {
+  private def testQuotaConfigChange(user: String, clientId: String, rootEntityType: String, sanitizedEntityName: String) {
     assertTrue("Should contain a ConfigHandler for " + rootEntityType ,
                this.servers.head.dynamicConfigHandlers.contains(rootEntityType))
     val props = new Properties()
@@ -66,8 +66,8 @@ class DynamicConfigChangeTest extends KafkaServerTestHarness {
 
     val quotaManagers = servers.head.apis.quotas
     rootEntityType match {
-      case ConfigType.Client => AdminUtils.changeClientIdConfig(zkUtils, Sanitizer.sanitize(configEntityName), props)
-      case _ => AdminUtils.changeUserOrUserClientIdConfig(zkUtils, Sanitizer.sanitize(configEntityName), props)
+      case ConfigType.Client => AdminUtils.changeClientIdConfig(zkUtils, sanitizedEntityName, props)
+      case _ => AdminUtils.changeUserOrUserClientIdConfig(zkUtils, sanitizedEntityName, props)
     }
 
     TestUtils.retry(10000) {
@@ -85,8 +85,8 @@ class DynamicConfigChangeTest extends KafkaServerTestHarness {
 
     val emptyProps = new Properties()
     rootEntityType match {
-      case ConfigType.Client => AdminUtils.changeClientIdConfig(zkUtils, Sanitizer.sanitize(configEntityName), emptyProps)
-      case _ => AdminUtils.changeUserOrUserClientIdConfig(zkUtils, Sanitizer.sanitize(configEntityName), emptyProps)
+      case ConfigType.Client => AdminUtils.changeClientIdConfig(zkUtils, sanitizedEntityName, emptyProps)
+      case _ => AdminUtils.changeUserOrUserClientIdConfig(zkUtils, sanitizedEntityName, emptyProps)
     }
     TestUtils.retry(10000) {
       val producerQuota = quotaManagers.produce.quota(user, clientId)
@@ -101,17 +101,23 @@ class DynamicConfigChangeTest extends KafkaServerTestHarness {
 
   @Test
   def testClientIdQuotaConfigChange() {
-    testQuotaConfigChange("ANONYMOUS", "testClient", ConfigType.Client, "testClient")
+    val clientId = "testClient<>$%!="
+    testQuotaConfigChange("ANONYMOUS", clientId, ConfigType.Client, Sanitizer.sanitize(clientId))
   }
 
   @Test
   def testUserQuotaConfigChange() {
-    testQuotaConfigChange("ANONYMOUS", "testClient", ConfigType.User, "ANONYMOUS")
+    val user = "CN=testUser, O=Apache"
+    testQuotaConfigChange(user, "testClient", ConfigType.User, Sanitizer.sanitize(user))
   }
 
   @Test
   def testUserClientIdQuotaChange() {
-    testQuotaConfigChange("ANONYMOUS", "testClient", ConfigType.User, "ANONYMOUS/clients/testClient")
+    val clientId = "testClient<>$%!="
+    val user = "CN=testUser, O=Apache"
+    val sanitizedClientId = Sanitizer.sanitize(clientId)
+    val sanitizedUser = Sanitizer.sanitize(user)
+    testQuotaConfigChange(user, clientId, ConfigType.User, s"$sanitizedUser/clients/$sanitizedClientId")
   }
 
   @Test

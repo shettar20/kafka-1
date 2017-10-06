@@ -41,7 +41,7 @@ class ClientRequestQuotaManager(private val config: ClientQuotaManagerConfig,
     }
 
     if (quotasEnabled) {
-      val quotaSensors = getOrCreateQuotaSensors(request.session.principal.getName, request.header.clientId)
+      val quotaSensors = getOrCreateQuotaSensors(request.session.sanitizedUser, request.header.clientId)
       request.recordNetworkThreadTimeCallback = Some(timeNanos => recordNoThrottle(quotaSensors, nanosToPercentage(timeNanos)))
 
       recordAndThrottleOnQuotaViolation(

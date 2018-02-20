@@ -23,7 +23,7 @@ import javax.imageio.ImageIO
 import kafka.admin.ReassignPartitionsCommand
 import kafka.admin.ReassignPartitionsCommand.Throttle
 import org.apache.kafka.common.TopicPartition
-import kafka.server.{KafkaConfig, KafkaServer, QuotaType}
+import kafka.server.{KafkaConfig, KafkaServer, ReplicationQuotaType}
 import kafka.utils.TestUtils._
 import kafka.utils.{Exit, Logging, TestUtils, ZkUtils}
 import kafka.zk.{ReassignPartitionsZNode, ZooKeeperTestHarness}
@@ -247,21 +247,21 @@ object ReplicationQuotasTestRig {
 
     def printRateMetrics() {
       for (broker <- servers) {
-        val leaderRate: Double = measuredRate(broker, QuotaType.LeaderReplication)
+        val leaderRate: Double = measuredRate(broker, ReplicationQuotaType.LeaderReplication)
         if (broker.config.brokerId == 100)
           info("waiting... Leader rate on 101 is " + leaderRate)
         record(leaderRates, broker.config.brokerId, leaderRate)
         if (leaderRate > 0)
           trace("Leader Rate on " + broker.config.brokerId + " is " + leaderRate)
 
-        val followerRate: Double = measuredRate(broker, QuotaType.FollowerReplication)
+        val followerRate: Double = measuredRate(broker, ReplicationQuotaType.FollowerReplication)
         record(followerRates, broker.config.brokerId, followerRate)
         if (followerRate > 0)
           trace("Follower Rate on " + broker.config.brokerId + " is " + followerRate)
       }
     }
 
-    private def measuredRate(broker: KafkaServer, repType: QuotaType): Double = {
+    private def measuredRate(broker: KafkaServer, repType: ReplicationQuotaType): Double = {
       val metricName = broker.metrics.metricName("byte-rate", repType.toString)
       if (broker.metrics.metrics.asScala.contains(metricName))
         broker.metrics.metrics.asScala(metricName).value

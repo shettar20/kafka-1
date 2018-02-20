@@ -21,8 +21,10 @@ import java.util.concurrent.{Executors, Future, TimeUnit}
 
 import kafka.log.LogConfig
 import kafka.network.RequestChannel.Session
+import kafka.quota.ClientQuotaType
 import kafka.security.auth._
 import kafka.utils.TestUtils
+
 import org.apache.kafka.clients.admin.NewPartitions
 import org.apache.kafka.common.acl.{AccessControlEntry, AccessControlEntryFilter, AclBinding, AclBindingFilter, AclOperation, AclPermissionType}
 import org.apache.kafka.common.resource.{ResourceFilter, Resource => AdminResource, ResourceType => AdminResourceType}
@@ -132,28 +134,32 @@ class RequestQuotaTest extends BaseRequestTest {
     waitAndCheckResults()
   }
 
+  def session(user: String): Session = Session(new KafkaPrincipal(KafkaPrincipal.USER_TYPE, user), null)
+
   private def throttleTimeMetricValue(clientId: String): Double = {
     val metricName = leaderNode.metrics.metricName("throttle-time",
-                                  QuotaType.Request.toString,
+                                  ClientQuotaType.Request.toString,
                                   "",
                                   "user", "",
                                   "client-id", clientId)
-    val sensor = leaderNode.quotaManagers.request.getOrCreateQuotaSensors("ANONYMOUS", clientId).throttleTimeSensor
+    val sensor = leaderNode.quotaManagers.request.getOrCreateQuotaSensors(session("ANONYMOUS"),
+      clientId).throttleTimeSensor
     metricValue(leaderNode.metrics.metrics.get(metricName), sensor)
   }
 
   private def requestTimeMetricValue(clientId: String): Double = {
     val metricName = leaderNode.metrics.metricName("request-time",
-                                  QuotaType.Request.toString,
+                                  ClientQuotaType.Request.toString,
                                   "",
                                   "user", "",
                                   "client-id", clientId)
-    val sensor = leaderNode.quotaManagers.request.getOrCreateQuotaSensors("ANONYMOUS", clientId).quotaSensor
+    val sensor = leaderNode.quotaManagers.request.getOrCreateQuotaSensors(session("ANONYMOUS"),
+      clientId).quotaSensor
     metricValue(leaderNode.metrics.metrics.get(metricName), sensor)
   }
 
   private def exemptRequestMetricValue: Double = {
-    val metricName = leaderNode.metrics.metricName("exempt-request-time", QuotaType.Request.toString, "")
+    val metricName = leaderNode.metrics.metricName("exempt-request-time", ClientQuotaType.Request.toString, "")
     metricValue(leaderNode.metrics.metrics.get(metricName), leaderNode.quotaManagers.request.exemptSensor)
   }
 

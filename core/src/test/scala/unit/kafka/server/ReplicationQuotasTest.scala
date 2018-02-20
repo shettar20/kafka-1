@@ -21,7 +21,7 @@ import java.util.Properties
 
 import kafka.log.LogConfig._
 import kafka.server.KafkaConfig.fromProps
-import kafka.server.QuotaType._
+import kafka.server.ReplicationQuotaType._
 import kafka.utils.TestUtils._
 import kafka.utils.CoreUtils._
 import kafka.zk.ZooKeeperTestHarness
@@ -227,11 +227,11 @@ class ReplicationQuotasTest extends ZooKeeperTestHarness {
     }
   }
 
-  private def avRate(replicationType: QuotaType, brokers: Seq[Int]): Double = {
+  private def avRate(replicationType: ReplicationQuotaType, brokers: Seq[Int]): Double = {
     brokers.map(brokerFor).map(measuredRate(_, replicationType)).sum / brokers.length
   }
 
-  private def measuredRate(broker: KafkaServer, repType: QuotaType): Double = {
+  private def measuredRate(broker: KafkaServer, repType: ReplicationQuotaType): Double = {
     val metricName = broker.metrics.metricName("byte-rate", repType.toString)
     broker.metrics.metrics.asScala(metricName).value
   }

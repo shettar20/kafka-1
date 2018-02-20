@@ -21,6 +21,8 @@ package kafka.server
 import java.util.Collections
 import java.util.concurrent.{DelayQueue, TimeUnit}
 
+import kafka.quota.ClientQuotaType
+
 import org.apache.kafka.common.metrics.MetricConfig
 import org.apache.kafka.common.utils.MockTime
 import org.junit.{Assert, Before, Test}
@@ -43,7 +45,7 @@ class ThrottledResponseExpirationTest {
 
   @Test
   def testExpire() {
-    val clientMetrics = new ClientQuotaManager(ClientQuotaManagerConfig(), metrics, QuotaType.Produce, time, "")
+    val clientMetrics = new ClientQuotaManager(ClientQuotaManagerConfig(), metrics, ClientQuotaType.Produce, time, "")
 
     val delayQueue = new DelayQueue[ThrottledResponse]()
     val reaper = new clientMetrics.ThrottledRequestReaper(delayQueue, "")

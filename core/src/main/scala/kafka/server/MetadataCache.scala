@@ -127,6 +127,14 @@ class MetadataCache(brokerId: Int) extends Logging {
     }
   }
 
+  def getAllPartitions(): Map[TopicPartition, UpdateMetadataRequest.PartitionState] = {
+    inReadLock(partitionMetadataLock) {
+      cache.flatMap { case (topic, partitionStates) =>
+        partitionStates.map { case (partition, state ) => (new TopicPartition(topic, partition), state) }
+      }.toMap
+    }
+  }
+
   def getNonExistingTopics(topics: Set[String]): Set[String] = {
     inReadLock(partitionMetadataLock) {
       topics -- cache.keySet

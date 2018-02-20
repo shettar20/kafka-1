@@ -18,7 +18,7 @@ package kafka.server
 
 import java.util.Collections
 
-import kafka.server.QuotaType._
+import kafka.server.ReplicationQuotaType._
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.metrics.{MetricConfig, Metrics, Quota}
 import org.apache.kafka.common.utils.MockTime
@@ -32,7 +32,7 @@ class ReplicationQuotaManagerTest {
 
   @Test
   def shouldThrottleOnlyDefinedReplicas() {
-    val quota = new ReplicationQuotaManager(ReplicationQuotaManagerConfig(), newMetrics, QuotaType.Fetch, time)
+    val quota = new ReplicationQuotaManager(ReplicationQuotaManagerConfig(), newMetrics, ReplicationQuotaType.LeaderReplication, time)
     quota.markThrottled("topic1", Seq(1, 2, 3))
 
     assertTrue(quota.isThrottled(tp1(1)))

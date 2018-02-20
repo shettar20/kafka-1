@@ -16,21 +16,20 @@
   */
 package kafka.server
 
-import kafka.server.QuotaType._
+import kafka.quota.ClientQuotaType._
+import kafka.server.ReplicationQuotaType._
 import kafka.utils.Logging
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.metrics.Metrics
 import org.apache.kafka.common.utils.Time
 
-object QuotaType  {
-  case object Fetch extends QuotaType
-  case object Produce extends QuotaType
-  case object Request extends QuotaType
-  case object LeaderReplication extends QuotaType
-  case object FollowerReplication extends QuotaType
-  case object AlterLogDirsReplication extends QuotaType
+object ReplicationQuotaType  {
+  case object LeaderReplication extends ReplicationQuotaType
+  case object FollowerReplication extends ReplicationQuotaType
+  case object AlterLogDirsReplication extends ReplicationQuotaType
 }
-sealed trait QuotaType
+sealed trait ReplicationQuotaType
+
 
 object QuotaFactory extends Logging {
 
@@ -54,9 +53,9 @@ object QuotaFactory extends Logging {
 
   def instantiate(cfg: KafkaConfig, metrics: Metrics, time: Time, threadNamePrefix: String): QuotaManagers = {
     QuotaManagers(
-      new ClientQuotaManager(clientFetchConfig(cfg), metrics, Fetch, time, threadNamePrefix),
-      new ClientQuotaManager(clientProduceConfig(cfg), metrics, Produce, time, threadNamePrefix),
-      new ClientRequestQuotaManager(clientRequestConfig(cfg), metrics, time, threadNamePrefix),
+      new ClientQuotaManager(clientFetchConfig(cfg), metrics, Fetch, time, threadNamePrefix, cfg.quotaCallback),
+      new ClientQuotaManager(clientProduceConfig(cfg), metrics, Produce, time, threadNamePrefix, cfg.quotaCallback),
+      new ClientRequestQuotaManager(clientRequestConfig(cfg), metrics, time, threadNamePrefix, cfg.quotaCallback),
       new ReplicationQuotaManager(replicationConfig(cfg), metrics, LeaderReplication, time),
       new ReplicationQuotaManager(replicationConfig(cfg), metrics, FollowerReplication, time),
       new ReplicationQuotaManager(alterLogDirsReplicationConfig(cfg), metrics, AlterLogDirsReplication, time)

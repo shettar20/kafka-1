@@ -69,7 +69,7 @@ object Constants {
   */
 class ReplicationQuotaManager(val config: ReplicationQuotaManagerConfig,
                               private val metrics: Metrics,
-                              private val replicationType: QuotaType,
+                              private val replicationType: ReplicationQuotaType,
                               private val time: Time) extends Logging with ReplicaQuota {
   private val lock = new ReentrantReadWriteLock()
   private val throttledPartitions = new ConcurrentHashMap[String, Seq[Int]]()

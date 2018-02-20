@@ -16,7 +16,8 @@ package kafka.api
 
 import java.util.{Collections, HashMap, Properties}
 
-import kafka.server.{ClientQuotaManagerConfig, DynamicConfig, KafkaConfig, KafkaServer, QuotaId, QuotaType}
+import kafka.quota._
+import kafka.server.{ClientQuotaManagerConfig, DynamicConfig, KafkaConfig, KafkaServer}
 import kafka.utils.TestUtils
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.clients.producer._
@@ -25,6 +26,8 @@ import org.apache.kafka.common.{MetricName, TopicPartition}
 import org.apache.kafka.common.metrics.{KafkaMetric, Quota}
 import org.junit.Assert._
 import org.junit.{Before, Test}
+
+case class QuotaId(sanitizedUser: Option[String], clientId: Option[String])
 
 abstract class BaseQuotaTest extends IntegrationTestHarness {
 
@@ -65,7 +68,7 @@ abstract class BaseQuotaTest extends IntegrationTestHarness {
 
   var leaderNode: KafkaServer = null
   var followerNode: KafkaServer = null
-  private val topic1 = "topic-1"
+  val topic1 = "topic-1"
 
   @Before
   override def setUp() {
@@ -166,7 +169,7 @@ abstract class BaseQuotaTest extends IntegrationTestHarness {
     do {
       val payload = numProduced.toString.getBytes
       p.send(new ProducerRecord[Array[Byte], Array[Byte]](topic1, null, null, payload),
-             new ErrorLoggingCallback(topic1, null, null, true)).get()
+        new ErrorLoggingCallback(topic1, null, null, true)).get()
       numProduced += 1
       val throttleMetric = producerThrottleMetric
       throttled = throttleMetric != null && throttleMetric.value > 0
@@ -188,7 +191,7 @@ abstract class BaseQuotaTest extends IntegrationTestHarness {
     if (throttled && numConsumed < maxRecords) {
       val minRecords = numConsumed + 1
       while (numConsumed < minRecords)
-          numConsumed += consumer.poll(100).count
+        numConsumed += consumer.poll(100).count
     }
     numConsumed
   }
@@ -208,7 +211,7 @@ abstract class BaseQuotaTest extends IntegrationTestHarness {
     }
   }
 
-  private def verifyProducerThrottleTimeMetric(producer: KafkaProducer[_, _]) {
+  protected def verifyProducerThrottleTimeMetric(producer: KafkaProducer[_, _]) {
     val tags = new HashMap[String, String]
     tags.put("client-id", producerClientId)
     val avgMetric = producer.metrics.get(new MetricName("produce-throttle-time-avg", "producer-metrics", "", tags))
@@ -218,7 +221,7 @@ abstract class BaseQuotaTest extends IntegrationTestHarness {
         s"Producer throttle metric not updated: avg=${avgMetric.value} max=${maxMetric.value}")
   }
 
-  private def verifyConsumerThrottleTimeMetric(consumer: KafkaConsumer[_, _], maxThrottleTime: Option[Double] = None) {
+  protected def verifyConsumerThrottleTimeMetric(consumer: KafkaConsumer[_, _], maxThrottleTime: Option[Double] = None) {
     val tags = new HashMap[String, String]
     tags.put("client-id", consumerClientId)
     val avgMetric = consumer.metrics.get(new MetricName("fetch-throttle-time-avg", "consumer-fetch-manager-metrics", "", tags))
@@ -229,7 +232,7 @@ abstract class BaseQuotaTest extends IntegrationTestHarness {
     maxThrottleTime.foreach(max => assertTrue(s"Maximum consumer throttle too high: ${maxMetric.value}", maxMetric.value <= max))
   }
 
-  private def throttleMetricName(quotaType: QuotaType, quotaId: QuotaId): MetricName = {
+  def throttleMetricName(quotaType: ClientQuotaType, quotaId: QuotaId): MetricName = {
     leaderNode.metrics.metricName("throttle-time",
                                   quotaType.toString,
                                   "Tracking throttle-time per user/client-id",
@@ -237,16 +240,16 @@ abstract class BaseQuotaTest extends IntegrationTestHarness {
                                   "client-id", quotaId.clientId.getOrElse(""))
   }
 
-  def throttleMetric(quotaType: QuotaType, quotaId: QuotaId): KafkaMetric = {
-    leaderNode.metrics.metrics.get(throttleMetricName(quotaType, quotaId))
+  def throttleMetric(quotaType: ClientQuotaType, quotaId: QuotaId, server: KafkaServer): KafkaMetric = {
+    server.metrics.metrics.get(throttleMetricName(quotaType, quotaId))
   }
 
-  private def producerThrottleMetric = throttleMetric(QuotaType.Produce, producerQuotaId)
-  private def consumerThrottleMetric = throttleMetric(QuotaType.Fetch, consumerQuotaId)
-  private def consumerRequestThrottleMetric = throttleMetric(QuotaType.Request, consumerQuotaId)
+  protected def producerThrottleMetric = throttleMetric(ClientQuotaType.Produce, producerQuotaId, leaderNode)
+  protected def consumerThrottleMetric = throttleMetric(ClientQuotaType.Fetch, consumerQuotaId, leaderNode)
+  protected def consumerRequestThrottleMetric = throttleMetric(ClientQuotaType.Request, consumerQuotaId, leaderNode)
 
   private def exemptRequestMetric: KafkaMetric = {
-    val metricName = leaderNode.metrics.metricName("exempt-request-time", QuotaType.Request.toString, "")
+    val metricName = leaderNode.metrics.metricName("exempt-request-time", ClientQuotaType.Request.toString, "")
     leaderNode.metrics.metrics.get(metricName)
   }
 
